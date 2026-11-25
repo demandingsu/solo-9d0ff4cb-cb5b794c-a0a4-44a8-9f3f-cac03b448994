@@ -1,0 +1,29 @@
+[
+  {
+    "source": "站A档案室",
+    "kind": "publish",
+    "no": "F-1003",
+    "content": {
+      "range_no": "R-13",
+      "rules_no": "G-13",
+      "title": "2024 年汛后发布（分区表漏掉左岸条带，预期核对未通过）"
+    }
+  },
+  {
+    "source": "站A档案室",
+    "kind": "range",
+    "no": "R-13",
+    "content": {"wl_min": 0, "wl_max": 10, "fl_min": 0, "fl_max": 10}
+  },
+  {
+    "source": "站A档案室",
+    "kind": "rules",
+    "no": "G-13",
+    "content": {
+      "rules": [
+        {"zone": "右岸区", "priority": 10, "wl_min": 5, "wl_max": 10,
+         "fl_min": 0, "fl_max": 10}
+      ]
+    }
+  }
+]

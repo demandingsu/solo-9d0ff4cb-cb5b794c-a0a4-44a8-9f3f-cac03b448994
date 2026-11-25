@@ -1,0 +1,32 @@
+[
+  {
+    "source": "站A档案室",
+    "kind": "rules",
+    "no": "G-11",
+    "content": {
+      "rules": [
+        {"zone": "左岸区", "priority": 10, "wl_min": 0, "wl_max": 4,
+         "fl_min": 0, "fl_max": 10},
+        {"zone": "右岸区", "priority": 10, "wl_min": 5, "wl_max": 10,
+         "fl_min": 0, "fl_max": 10},
+        {"zone": "洪峰区", "priority": 1, "wl_min": 8, "wl_max": 10,
+         "fl_min": 8, "fl_max": 10}
+      ]
+    }
+  },
+  {
+    "source": "站A档案室",
+    "kind": "rules",
+    "no": "G-12",
+    "content": {
+      "rules": [
+        {"zone": "左岸区", "priority": 10, "wl_min": 0, "wl_max": 5,
+         "fl_min": 0, "fl_max": 10},
+        {"zone": "右岸区", "priority": 10, "wl_min": 6, "wl_max": 10,
+         "fl_min": 0, "fl_max": 10},
+        {"zone": "洪峰区", "priority": 1, "wl_min": 8, "wl_max": 10,
+         "fl_min": 8, "fl_max": 10}
+      ]
+    }
+  }
+]

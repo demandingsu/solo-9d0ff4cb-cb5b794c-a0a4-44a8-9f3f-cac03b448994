@@ -255,10 +255,132 @@ def main() -> int:
         ("/publish", "发布口径修订"),
         ("/attempts", "发布与核对记录"),
         ("/attempts/1", "初始播种"),
+        ("/archive", "历史档案收料"),
     ]:
         html = client.get(path)
         ok = html.status_code == 200 and token.encode() in html.data
         check(f"GET {path} -> 200 且含“{token}”", ok)
+
+    # ------------------------------------------------------------------ #
+    banner("6. 历史档案：按来源保存、缺项、核对与查算")
+    # ------------------------------------------------------------------ #
+    arc_rules = [
+        {"zone": "左岸区", "priority": 10, "wl_min": 0, "wl_max": 5,
+         "fl_min": 0, "fl_max": 10},
+        {"zone": "右岸区", "priority": 10, "wl_min": 6, "wl_max": 10,
+         "fl_min": 0, "fl_max": 10},
+        {"zone": "洪峰区", "priority": 1, "wl_min": 8, "wl_max": 10,
+         "fl_min": 8, "fl_max": 10},
+    ]
+    pub = {"source": "站A档案室", "kind": "publish", "no": "F-1001",
+           "content": {"range_no": "R-11", "rules_no": "G-11"}}
+    rngm = {"source": "站A档案室", "kind": "range", "no": "R-11",
+            "content": {"wl_min": 0, "wl_max": 10, "fl_min": 0, "fl_max": 10}}
+    rlsm = {"source": "站A档案室", "kind": "rules", "no": "G-11",
+            "content": {"rules": arc_rules}}
+
+    r = client.post("/api/archive/materials", json=pub)
+    body = r.get_json()
+    rec = body["record"]
+    check(
+        "发布记录先到 -> 材料未齐并列出缺项",
+        r.status_code == 200 and rec["state"] == "incomplete"
+        and {m["kind"] for m in rec["missing"]} == {"range", "rules"},
+        "缺：" + "、".join(m["label"].replace("缺", "") for m in rec["missing"]),
+    )
+    early = client.get(
+        "/api/archive/classify?source=站A档案室&publish_no=F-1001&wl=9&flow=9"
+    )
+    check("材料未齐时查算被拒(409)", early.status_code == 409)
+
+    client.post("/api/archive/materials", json=rngm)
+    mid = client.get("/api/archive/records?source=站A档案室").get_json()["records"][0]
+    check(
+        "量程到 -> 仍缺分区表",
+        mid["state"] == "incomplete" and [m["kind"] for m in mid["missing"]] == ["rules"],
+    )
+
+    r = client.post("/api/archive/materials", json=rlsm)
+    body = r.get_json()
+    check(
+        "分区表到 -> 刚补齐并核对通过",
+        body["material"]["created"]
+        and len(body["completed"]) == 1
+        and body["completed"][0]["state"] == "verified",
+    )
+    hit = client.get(
+        "/api/archive/classify?source=站A档案室&publish_no=F-1001&wl=9&flow=9"
+    ).get_json()
+    check("核对通过后查原分区 -> 洪峰区", hit.get("zone") == "洪峰区")
+
+    dup = client.post("/api/archive/materials", json=rlsm)
+    check(
+        "同来源同号同内容 -> 去重不新增",
+        dup.status_code == 200 and dup.get_json()["material"]["deduplicated"],
+    )
+
+    conflict_payload = dict(rngm)
+    conflict_payload["content"] = {
+        "wl_min": 0, "wl_max": 20, "fl_min": 0, "fl_max": 10,
+    }
+    conflict = client.post("/api/archive/materials", json=conflict_payload)
+    check(
+        "同来源同号不同内容 -> 整份退回(409)",
+        conflict.status_code == 409
+        and conflict.get_json()["status"] == "conflict",
+    )
+    still = client.get(
+        "/api/archive/classify?source=站A档案室&publish_no=F-1001&wl=9&flow=9"
+    )
+    check("冲突退回后已入库版本未变，仍可查算", still.status_code == 200)
+
+    other = {"source": "站B水文站", "kind": "publish", "no": "F-1001",
+             "content": {"range_no": "R-11", "rules_no": "G-11"}}
+    r = client.post("/api/archive/materials", json=other)
+    check(
+        "不同来源允许重号，各自独立",
+        r.status_code == 200
+        and r.get_json()["record"]["source"] == "站B水文站"
+        and r.get_json()["record"]["state"] == "incomplete",
+    )
+
+    bad_steps = [
+        {"source": "站A档案室", "kind": "publish", "no": "F-1002",
+         "content": {"range_no": "R-12", "rules_no": "G-12"}},
+        {"source": "站A档案室", "kind": "range", "no": "R-12",
+         "content": {"wl_min": 0, "wl_max": 10, "fl_min": 0, "fl_max": 10}},
+        {"source": "站A档案室", "kind": "rules", "no": "G-12",
+         "content": {"rules": [arc_rules[1], arc_rules[2]]}},
+    ]
+    for item in bad_steps:
+        r = client.post("/api/archive/materials", json=item)
+    body = r.get_json()
+    failed_rec = body["completed"][0] if body.get("completed") else None
+    check(
+        "组合漏分 -> 核对未通过并给出原因，材料照收",
+        r.status_code == 200
+        and failed_rec is not None
+        and failed_rec["state"] == "failed"
+        and bool(failed_rec["reason"]["summary"]),
+        (failed_rec or {}).get("reason", {}).get("summary", [""])[0],
+    )
+    failed_q = client.get(
+        "/api/archive/classify?source=站A档案室&publish_no=F-1002&wl=0&flow=0"
+    )
+    check("核对未通过的档案不开放查算(409)", failed_q.status_code == 409)
+
+    page = client.get("/archive")
+    check(
+        "档案页列出缺项",
+        page.status_code == 200
+        and "F-1001".encode() in page.data
+        and "缺量程".encode() in page.data,
+    )
+    detail = client.get("/archive/records/1")
+    check(
+        "已核对档案详情页可查原分区",
+        detail.status_code == 200 and "按历史口径查原分区".encode() in detail.data,
+    )
 
     # ------------------------------------------------------------------ #
     banner("自测汇总")

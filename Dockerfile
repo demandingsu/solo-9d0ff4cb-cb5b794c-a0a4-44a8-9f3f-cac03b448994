@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY hydrology ./hydrology
 COPY scripts ./scripts
+COPY samples ./samples
 COPY app.py docker-entrypoint.sh ./
 
 RUN chmod +x /app/docker-entrypoint.sh \

@@ -26,8 +26,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.teardown_appcontext(close_db)
 
     from .api import bp as api_bp
+    from .archive_api import bp as archive_api_bp
+    from .archive_web import bp as archive_web_bp
     from .web import bp as web_bp
 
     app.register_blueprint(web_bp)
+    app.register_blueprint(archive_web_bp)
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(archive_api_bp, url_prefix="/api/archive")
     return app

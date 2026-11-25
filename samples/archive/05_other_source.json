@@ -1,0 +1,29 @@
+[
+  {
+    "source": "站B水文站",
+    "kind": "publish",
+    "no": "F-1001",
+    "content": {
+      "range_no": "R-11",
+      "rules_no": "G-11",
+      "title": "站B 同名编号的独立发布记录（不同来源允许重号）"
+    }
+  },
+  {
+    "source": "站B水文站",
+    "kind": "range",
+    "no": "R-11",
+    "content": {"wl_min": 0, "wl_max": 6, "fl_min": 0, "fl_max": 6}
+  },
+  {
+    "source": "站B水文站",
+    "kind": "rules",
+    "no": "G-11",
+    "content": {
+      "rules": [
+        {"zone": "全测区", "priority": 1, "wl_min": 0, "wl_max": 6,
+         "fl_min": 0, "fl_max": 6}
+      ]
+    }
+  }
+]

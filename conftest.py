@@ -20,5 +20,13 @@ def app(tmp_path):
 
 
 @pytest.fixture()
+def db_path(tmp_path):
+    """已初始化的临时 SQLite 路径，供直接调用服务层的测试使用。"""
+    path = tmp_path / "service_hydrology.db"
+    create_app({"TESTING": True, "DATABASE": str(path)})
+    return str(path)
+
+
+@pytest.fixture()
 def client(app):
     return app.test_client()

@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}历史档案收料 · 水文分区发布台{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1>历史档案收料</h1>
+  <p class="muted">
+    按<strong>来源库号</strong>接收三类材料：<strong>发布记录</strong>（用原编号）、
+    <strong>量程</strong>与<strong>分区表</strong>（用量程 / 分区表的原版本号）。
+    相同来源允许重号；同一来源、同一类别、同一编号只存一份，内容冲突整份退回。
+    发布记录引用的量程与分区表到齐后，按该组合自动核对；<strong>核对通过前不开放查算</strong>。
+  </p>
+</div>
+
+{% if results %}
+<section class="card">
+  <h2>本次收料结果</h2>
+  <div class="batch-results">
+    {% for item in results %}
+      <div class="panel {{ 'panel-ok' if item.ok else 'panel-bad' }}">
+        <h3>
+          {% if item.ok %}
+            ✅ 第 {{ item.index }} 份 · {{ item.summary }}
+          {% else %}
+            ❌ 第 {{ item.index }} 份 · 整份退回
+          {% endif %}
+        </h3>
+        {% if item.ok %}
+          {% if item.result.completed %}
+            <ul class="meta-list">
+              {% for rec in item.result.completed %}
+                <li>
+                  刚补齐：{{ rec.source }} / 发布号 {{ rec.publish_no }}（量程 {{ rec.range_no }}、
+                  分区表 {{ rec.rules_no }}）→
+                  <span class="badge {{ 'badge-ok' if rec.state == 'verified' else 'badge-bad' }}">{{ rec.state_label }}</span>
+                  <a href="{{ url_for('archive.archive_detail', record_id=rec.id) }}">查看档案</a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          {% if item.result.record %}
+            <p class="muted">
+              发布号 {{ item.result.record.publish_no }} 当前缺项：
+              {% if item.result.record.missing %}
+                {% for m in item.result.record.missing %}
+                  <span class="badge badge-warn">{{ m.label }}（原版本号 {{ m.no }}）</span>
+                {% endfor %}
+              {% else %}无{% endif %}
+            </p>
+          {% endif %}
+        {% else %}
+          {% if item.errors %}
+            <ul class="error-list">{% for e in item.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+          {% endif %}
+          {% if item.conflict %}
+            <p class="muted">
+              冲突位置：来源 <strong>{{ item.conflict.source }}</strong> ·
+              {{ item.conflict.kind_label }} · 编号 <strong>{{ item.conflict.no }}</strong>。
+              已入库版本未被改动。
+            </p>
+            <details>
+              <summary>对比已入库内容与本次内容</summary>
+              <div class="grid-two">
+                <div>
+                  <h4>已入库</h4>
+                  <pre class="json-pre">{{ item.conflict.existing_content | tojson(indent=2) }}</pre>
+                </div>
+                <div>
+                  <h4>本次上传</h4>
+                  <pre class="json-pre">{{ item.conflict.incoming_content | tojson(indent=2) }}</pre>
+                </div>
+              </div>
+            </details>
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if upload_error %}
+<div class="panel panel-bad">
+  <h3>上传内容无法解析，整份退回</h3>
+  <ul class="error-list">{% for e in upload_error %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<section class="card">
+  <h2>上传 JSON</h2>
+  <form method="post" action="{{ url_for('archive.archive_page') }}" enctype="multipart/form-data">
+    <label class="note-field">
+      粘贴一份材料，或一个材料数组（分批上传的一批，按顺序逐份入库）
+      <textarea name="payload" rows="12" spellcheck="false"
+                placeholder='{"source":"站A档案室","kind":"publish","no":"F-2024-001","content":{"range_no":"R-7","rules_no":"G-7"}}'>{{ upload_text }}</textarea>
+    </label>
+    <label class="note-field">
+      或选择 UTF-8 JSON 文件
+      <input type="file" name="file" accept="application/json,.json">
+    </label>
+    <div class="publish-actions">
+      <button type="submit" class="btn btn-primary">收料并核对</button>
+    </div>
+  </form>
+  <details class="more-samples">
+    <summary>三类材料格式</summary>
+<pre class="json-pre">发布记录  {"source":"站A档案室","kind":"publish","no":"F-2024-001",
+          "content":{"range_no":"R-7","rules_no":"G-7"}}
+量程      {"source":"站A档案室","kind":"range","no":"R-7",
+          "content":{"wl_min":0,"wl_max":120,"fl_min":0,"fl_max":1000}}
+分区表    {"source":"站A档案室","kind":"rules","no":"G-7",
+          "content":{"rules":[{"zone":"低水低流量区","priority":10,
+                              "wl_min":0,"wl_max":49,"fl_min":0,"fl_max":399}, …]}}</pre>
+    <p class="muted small">
+      也接受 <code>{"kind":"rules","content":[…]}</code>（内容直接为规则数组），
+      以及 <code>{"kind":"range","range":{…}}</code> 等嵌套写法。类别也可写中文
+      “发布记录 / 量程 / 分区表”。
+    </p>
+  </details>
+</section>
+
+<section class="card">
+  <div class="rules-head">
+    <h2>按来源与发布号列出缺项</h2>
+    <form method="get" action="{{ url_for('archive.archive_page') }}" class="filter-form">
+      <label>来源筛选
+        <input type="text" name="source" value="{{ source_filter }}" placeholder="全部来源">
+      </label>
+      <button type="submit" class="btn btn-small">筛选</button>
+      {% if source_filter %}<a class="btn btn-small btn-ghost" href="{{ url_for('archive.archive_page') }}">清除</a>{% endif %}
+    </form>
+  </div>
+
+  {% if not grouped %}
+    <p class="muted">暂无档案记录。上传发布记录后，这里会按来源与发布号列出所缺的量程 / 分区表。</p>
+  {% endif %}
+
+  {% for source, records in grouped.items() %}
+    <h3 class="source-heading">来源：<strong>{{ source }}</strong>
+      <span class="muted small">（{{ records|length }} 条发布记录）</span>
+    </h3>
+    <div class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>发布号</th><th>状态</th><th>引用量程</th><th>引用分区表</th>
+            <th>缺项</th><th>核对时间 (UTC)</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+            <tr>
+              <td><strong>{{ r.publish_no }}</strong></td>
+              <td>
+                {% if r.state == 'verified' %}
+                  <span class="badge badge-ok">{{ r.state_label }}</span>
+                {% elif r.state == 'failed' %}
+                  <span class="badge badge-bad">{{ r.state_label }}</span>
+                  {% if r.reason and r.reason.summary %}
+                    <div class="muted small">原因：{{ r.reason.summary[0] }}</div>
+                  {% endif %}
+                {% else %}
+                  <span class="badge badge-warn">{{ r.state_label }}</span>
+                {% endif %}
+              </td>
+              <td>{{ r.range_no }}</td>
+              <td>{{ r.rules_no }}</td>
+              <td>
+                {% if r.missing %}
+                  {% for m in r.missing %}
+                    <span class="badge badge-warn">{{ m.label }} {{ m.no }}</span>
+                  {% endfor %}
+                {% else %}—{% endif %}
+              </td>
+              <td class="nowrap">{{ (r.checked_at or '—').replace('T', ' ').replace('+00:00', '') }}</td>
+              <td><a class="btn btn-small" href="{{ url_for('archive.archive_detail', record_id=r.id) }}">详情 / 查算</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+</section>
+
+<section class="card">
+  <h2>已收材料清单</h2>
+  <p class="muted small">同一来源、同一类别、同一编号只保留一份；未被任何发布记录引用的量程 / 分区表也会列在这里。</p>
+  {% if materials %}
+    <div class="table-scroll">
+      <table class="table table-compact">
+        <thead><tr><th>来源</th><th>类别</th><th>原编号</th><th>内容摘要 (SHA-256)</th><th>收到时间 (UTC)</th></tr></thead>
+        <tbody>
+          {% for m in materials %}
+            <tr>
+              <td>{{ m.source }}</td>
+              <td>{{ m.kind_label }}</td>
+              <td><strong>{{ m.no }}</strong></td>
+              <td class="muted small">{{ m.digest[:16] }}…</td>
+              <td class="nowrap">{{ m.created_at.replace('T', ' ').replace('+00:00', '') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted">暂无材料。</p>
+  {% endif %}
+</section>
+
+{% endblock %}

@@ -1,0 +1,14 @@
+[
+  {
+    "source": "站A档案室",
+    "kind": "range",
+    "no": "R-11",
+    "content": {"wl_min": 0, "wl_max": 10, "fl_min": 0, "fl_max": 10}
+  },
+  {
+    "source": "站A档案室",
+    "kind": "range",
+    "no": "R-12",
+    "content": {"wl_min": 0, "wl_max": 10, "fl_min": 0, "fl_max": 10}
+  }
+]

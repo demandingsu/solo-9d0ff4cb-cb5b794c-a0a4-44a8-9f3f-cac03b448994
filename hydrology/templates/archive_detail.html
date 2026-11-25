@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% from "_report.html" import report_panel %}
+{% block title %}档案 {{ record.source }} / {{ record.publish_no }} · 水文分区发布台{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1>档案：{{ record.source }} / 发布号 {{ record.publish_no }}
+    {% if record.state == 'verified' %}
+      <span class="badge badge-ok">{{ record.state_label }}</span>
+    {% elif record.state == 'failed' %}
+      <span class="badge badge-bad">{{ record.state_label }}</span>
+    {% else %}
+      <span class="badge badge-warn">{{ record.state_label }}</span>
+    {% endif %}
+  </h1>
+  <p class="muted">
+    引用量程原版本号 <strong>{{ record.range_no }}</strong> ·
+    引用分区表原版本号 <strong>{{ record.rules_no }}</strong>
+    {% if record.checked_at %} · 核对于 {{ record.checked_at.replace('T', ' ').replace('+00:00', ' UTC') }}{% endif %}
+  </p>
+  <p><a class="btn" href="{{ url_for('archive.archive_page') }}">← 返回档案收料</a></p>
+</div>
+
+{% if record.missing %}
+  <div class="panel panel-warn">
+    <h3>材料未齐，尚不能核对</h3>
+    <p>该发布记录仍在等待以下材料（来源 {{ record.source }}）：</p>
+    <ul class="meta-list">
+      {% for m in record.missing %}
+        <li>{{ m.label }}，原版本号 <strong>{{ m.no }}</strong></li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif record.reason %}
+  <div class="panel panel-bad">
+    <h3>核对未通过（该档案不开放查算）</h3>
+    <ul class="error-list">
+      {% for line in record.reason.summary %}<li>{{ line }}</li>{% endfor %}
+    </ul>
+    <p class="muted small">
+      同来源的其他材料照常接收，本档案不会被删改。材料一旦入库即不可更替：
+      同号不同内容的上传会被整份退回。若本组合确有错误，请以新的发布号与版本号重新归档。
+    </p>
+  </div>
+{% endif %}
+
+{% if record.state == 'verified' %}
+<section class="card">
+  <h2>按历史口径查原分区</h2>
+  <p class="muted">按该档案引用的量程 <strong>{{ record.range_no }}</strong> 与分区表
+    <strong>{{ record.rules_no }}</strong> 核对通过后的组合查算，与现行口径互不影响。</p>
+  <form method="post" action="{{ url_for('archive.archive_detail', record_id=record.id) }}" class="query-form">
+    <label>水位
+      <input type="text" inputmode="numeric" name="wl" value="{{ wl_raw }}" placeholder="整数" autocomplete="off">
+    </label>
+    <label>流量
+      <input type="text" inputmode="numeric" name="flow" value="{{ fl_raw }}" placeholder="整数" autocomplete="off">
+    </label>
+    <button type="submit" class="btn btn-primary">查原分区</button>
+  </form>
+
+  {% if query_errors %}
+    <div class="result result-bad_input">
+      <h3>无法查算</h3>
+      <ul class="error-list">{% for e in query_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  {% elif query_result %}
+    <div class="result result-{{ query_result.status }}">
+      {% if query_result.status == 'classified' %}
+        <div class="result-zone">{{ query_result.zone }}</div>
+        <p>{{ query_result.message }}；优先级 {{ query_result.priority }}。</p>
+      {% elif query_result.status == 'out_of_range' %}
+        <h3>超出该档案量程</h3>
+        <p>{{ query_result.message }}。量程：水位
+          [{{ query_result.range.wl_min }}, {{ query_result.range.wl_max }}]，
+          流量 [{{ query_result.range.fl_min }}, {{ query_result.range.fl_max }}]。</p>
+      {% elif query_result.status == 'uncovered' %}
+        <h3>漏分</h3><p>{{ query_result.message }}</p>
+      {% elif query_result.status == 'ambiguous' %}
+        <h3>最高级并列</h3>
+        <p>{{ query_result.message }}。命中的最高级分区：
+          {% for z in query_result.tied_top_zones %}<span class="badge badge-tie">{{ z }}</span>{% endfor %}
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% elif record.state == 'failed' %}
+<section class="card">
+  <h2>核对报告（未通过，不开放查算）</h2>
+  {% if record.report %}
+    {{ report_panel(record.report,
+                    heading='✅ 组合核对通过',
+                    bad_heading='❌ 组合核对未通过，档案不开放查算') }}
+  {% endif %}
+</section>
+{% endif %}
+
+{% if record.range_content or record.rules_content %}
+<section class="card">
+  <h2>该档案使用的材料</h2>
+  {% if record.range_content %}
+    <h3>量程（原版本号 {{ record.range_no }}）</h3>
+    <p>水位 [{{ record.range_content.wl_min }}, {{ record.range_content.wl_max }}]，
+       流量 [{{ record.range_content.fl_min }}, {{ record.range_content.fl_max }}]</p>
+  {% endif %}
+  {% if record.rules_content %}
+    <h3>分区表（原版本号 {{ record.rules_no }}，共 {{ record.rules_content|length }} 条）</h3>
+    <div class="table-scroll">
+      <table class="table table-compact">
+        <thead><tr><th>#</th><th>分区名</th><th>优先级</th><th>水位闭区间</th><th>流量闭区间</th></tr></thead>
+        <tbody>
+          {% for r in record.rules_content %}
+            <tr>
+              <td>{{ loop.index }}</td><td>{{ r.zone }}</td><td>{{ r.priority }}</td>
+              <td>[{{ r.wl_min }}, {{ r.wl_max }}]</td>
+              <td>[{{ r.fl_min }}, {{ r.fl_max }}]</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% endblock %}

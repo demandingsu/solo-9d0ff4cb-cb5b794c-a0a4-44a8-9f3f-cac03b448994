@@ -1,8 +1,8 @@
 {# 核对报告面板：成功 / 结构错误 / 漏分见证 / 并列见证 #}
-{% macro report_panel(report) %}
+{% macro report_panel(report, heading=None, bad_heading=None) %}
   {% if report.ok %}
     <div class="panel panel-ok">
-      <h3>✅ 核对通过，可以发布</h3>
+      <h3>{{ heading or '✅ 核对通过，可以发布' }}</h3>
       <p>
         共扫描 <strong>{{ report.elementary_cells }}</strong> 个端点初等格
         （{{ report.rule_count }} 条规则，实际参与
@@ -16,7 +16,7 @@
     </div>
   {% else %}
     <div class="panel panel-bad">
-      <h3>❌ 核对未通过，本次发布已驳回，现行口径不变</h3>
+      <h3>{{ bad_heading or '❌ 核对未通过，本次发布已驳回，现行口径不变' }}</h3>
 
       {% if report.structural_errors %}
         <div class="issue-block">

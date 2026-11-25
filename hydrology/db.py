@@ -66,6 +66,44 @@ CREATE TABLE IF NOT EXISTS publish_attempts (
     report_json   TEXT NOT NULL,
     candidate_json TEXT
 );
+
+-- ---------------------------------------------------------------------- --
+-- 历史档案：按「来源库号 + 材料类别 + 原编号」保存三类材料。
+-- 发布记录（publish）引用同一来源下量程（range）与分区表（rules）的原版本号；
+-- 材料齐备后按各自引用的组合核对，只有核对通过才开放历史查算。
+-- ---------------------------------------------------------------------- --
+CREATE TABLE IF NOT EXISTS archive_materials (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    source       TEXT NOT NULL,               -- 来源库号
+    kind         TEXT NOT NULL,               -- publish | range | rules
+    no           TEXT NOT NULL,               -- 发布原编号 / 量程原版本号 / 分区表原版本号
+    content_json TEXT NOT NULL,               -- 规范化后的内容，用于判重 / 判冲突
+    digest       TEXT NOT NULL,               -- content_json 的 SHA-256
+    raw_json     TEXT NOT NULL DEFAULT '{}',  -- 原始 JSON，仅作留档
+    created_at   TEXT NOT NULL,
+    UNIQUE(source, kind, no)
+);
+CREATE INDEX IF NOT EXISTS idx_archive_materials_kind
+    ON archive_materials(source, kind, no);
+
+CREATE TABLE IF NOT EXISTS archive_records (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    source              TEXT NOT NULL,
+    publish_no          TEXT NOT NULL,
+    publish_material_id INTEGER NOT NULL REFERENCES archive_materials(id),
+    range_no            TEXT NOT NULL,
+    rules_no            TEXT NOT NULL,
+    state               TEXT NOT NULL,        -- incomplete | failed | verified
+    report_json         TEXT,                 -- 核对报告（通过 / 未通过都留档）
+    reason_json         TEXT,                 -- 未通过原因摘要 + 报告
+    checked_at          TEXT,
+    verified_at         TEXT,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL,
+    UNIQUE(source, publish_no)
+);
+CREATE INDEX IF NOT EXISTS idx_archive_records_state
+    ON archive_records(state);
 """
 
 

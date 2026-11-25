@@ -1,0 +1,24 @@
+[
+  {
+    "source": "站A档案室",
+    "kind": "publish",
+    "no": "F-1001",
+    "content": {
+      "range_no": "R-11",
+      "rules_no": "G-11",
+      "title": "2024 年汛前定线发布",
+      "published_on": "2024-03-01"
+    }
+  },
+  {
+    "source": "站A档案室",
+    "kind": "publish",
+    "no": "F-1002",
+    "content": {
+      "range_no": "R-12",
+      "rules_no": "G-12",
+      "title": "2024 年汛中修订发布",
+      "published_on": "2024-07-15"
+    }
+  }
+]
