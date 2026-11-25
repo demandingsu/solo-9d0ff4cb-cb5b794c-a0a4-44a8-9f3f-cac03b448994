@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}核对记录 · 水文分区发布台{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>发布与核对记录</h1>
+  <p class="muted">每一笔提交（含被驳回）都留痕。被驳回的提交不会移动现行版本指针。</p>
+  <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr><th>#</th><th>时间 (UTC)</th><th>类型</th><th>结果</th><th>备注</th><th>新版本</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in attempts %}
+          <tr>
+            <td>{{ a.id }}</td>
+            <td class="nowrap">{{ a.created_at.replace('T', ' ').replace('+00:00', '') }}</td>
+            <td>{{ a.kind|kind_label }}<span class="muted small">（{{ a.source }}）</span></td>
+            <td>
+              {% if a.accepted %}
+                <span class="badge badge-ok">通过 · 已发布</span>
+              {% else %}
+                <span class="badge badge-bad">驳回 · 沿用现行</span>
+              {% endif %}
+            </td>
+            <td>{{ a.note or '—' }}</td>
+            <td class="nowrap">
+              {% if a.range_id %}量程 #{{ a.range_id }}{% endif %}
+              {% if a.rules_id %}{% if a.range_id %} / {% endif %}规则 #{{ a.rules_id }}{% endif %}
+              {% if not a.range_id and not a.rules_id %}—{% endif %}
+            </td>
+            <td><a class="btn btn-small" href="{{ url_for('web.attempt_detail', attempt_id=a.id) }}">详情</a></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="muted">暂无记录。</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

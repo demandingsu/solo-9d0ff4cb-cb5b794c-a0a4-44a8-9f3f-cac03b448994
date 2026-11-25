@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}水文分区发布台{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="{{ url_for('web.index') }}">
+      <span class="brand-mark">≈</span> 水文分区发布台
+    </a>
+    <nav class="nav">
+      <a href="{{ url_for('web.index') }}"
+         class="{{ 'active' if request.endpoint == 'web.index' else '' }}">查算 · 现行口径</a>
+      <a href="{{ url_for('web.publish_page') }}"
+         class="{{ 'active' if request.endpoint == 'web.publish_page' else '' }}">发布修订</a>
+      <a href="{{ url_for('web.attempts_page') }}"
+         class="{{ 'active' if request.endpoint and request.endpoint.startswith('web.attempt') else '' }}">核对记录</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap content">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    口径规则：水位、流量均为整数闭区间；优先级数值越小越高（1 为最高）。
+    量程内每对读数须有唯一最高优先级规则。核对采用端点坐标压缩，不逐值枚举。
+  </div>
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

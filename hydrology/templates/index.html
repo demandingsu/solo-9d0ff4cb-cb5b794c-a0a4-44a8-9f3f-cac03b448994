@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}查算与现行口径 · 水文分区发布台{% endblock %}
+{% block content %}
+
+<section class="grid-two">
+  <div class="card">
+    <h2>单对读数查现行归属</h2>
+    <p class="muted">输入某一日观测的水位与流量整数读数。核对 / 发布期间，本页始终读取已生效的现行口径。</p>
+    <form method="get" action="{{ url_for('web.index') }}" class="query-form">
+      <label>
+        水位
+        <input type="text" inputmode="numeric" name="wl" value="{{ wl_raw }}"
+               placeholder="0–100" autocomplete="off">
+      </label>
+      <label>
+        流量
+        <input type="text" inputmode="numeric" name="flow" value="{{ fl_raw }}"
+               placeholder="0–1000" autocomplete="off">
+      </label>
+      <button type="submit" class="btn btn-primary">查归属</button>
+    </form>
+    <div class="quick-links">
+      快捷试算：
+      <a href="{{ url_for('web.index', wl=90, flow=900) }}">90 / 900（高水大流量）</a>
+      <a href="{{ url_for('web.index', wl=82, flow=820) }}">82 / 820</a>
+      <a href="{{ url_for('web.index', wl=10, flow=100) }}">10 / 100</a>
+      <a href="{{ url_for('web.index', wl=150, flow=100) }}">150 / 100（超量程）</a>
+    </div>
+
+    {% if result %}
+      <div class="result result-{{ result.status }}">
+        {% if result.status == 'classified' %}
+          <div class="result-zone">{{ result.zone }}</div>
+          <p>{{ result.message }}；命中规则优先级 {{ result.priority }}（数值越小越高）。</p>
+        {% elif result.status == 'out_of_range' %}
+          <h3>量程外读数</h3>
+          <p>{{ result.message }}。有效量程：
+            水位 [{{ result.range.wl_min }}, {{ result.range.wl_max }}]，
+            流量 [{{ result.range.fl_min }}, {{ result.range.fl_max }}]。</p>
+        {% elif result.status == 'uncovered' %}
+          <h3>漏分</h3><p>{{ result.message }}</p>
+        {% elif result.status == 'ambiguous' %}
+          <h3>最高级并列</h3>
+          <p>{{ result.message }}。命中的最高级分区：
+            {% for z in result.tied_top_zones %}<span class="badge badge-tie">{{ z }}</span>{% endfor %}
+          </p>
+        {% elif result.errors %}
+          <h3>输入有误</h3>
+          <ul class="error-list">{% for e in result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+
+        {% if result.matched %}
+          <details>
+            <summary>该点命中的全部 {{ result.matched|length }} 条规则（按优先级排序）</summary>
+            <table class="table table-compact">
+              <thead><tr><th>分区</th><th>优先级</th><th>水位区间</th><th>流量区间</th></tr></thead>
+              <tbody>
+                {% for r in result.matched %}
+                  <tr class="{{ 'winner-row' if loop.first and result.status == 'classified' else '' }}">
+                    <td>{{ r.zone }}</td><td>{{ r.priority }}</td>
+                    <td>[{{ r.wl_interval[0] }}, {{ r.wl_interval[1] }}]</td>
+                    <td>[{{ r.fl_interval[0] }}, {{ r.fl_interval[1] }}]</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </details>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>现行有效量程</h2>
+    {% if current.range %}
+      <div class="range-display">
+        <div class="range-item">
+          <span class="range-name">水位</span>
+          <span class="range-interval">[{{ current.range.wl_min }}, {{ current.range.wl_max }}]</span>
+        </div>
+        <div class="range-item">
+          <span class="range-name">流量</span>
+          <span class="range-interval">[{{ current.range.fl_min }}, {{ current.range.fl_max }}]</span>
+        </div>
+      </div>
+      <p class="muted">
+        量程版本 #{{ current.range_id }}
+        {% if current.range_meta and current.range_meta.created_at %}
+          · 发布于 {{ current.range_meta.created_at.replace('T', ' ').replace('+00:00', ' UTC') }}
+        {% endif %}
+      </p>
+    {% else %}
+      <p class="error-text">尚未初始化量程。</p>
+    {% endif %}
+    <p><a class="btn" href="{{ url_for('web.publish_page') }}">发布量程 / 规则修订 →</a></p>
+    <p><a class="btn btn-ghost" href="{{ url_for('api.api_current') }}" target="_blank" rel="noopener">查看 /api/current JSON</a></p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>现行分区表（版本 #{{ current.rules_id }}，共 {{ current.rules|length }} 条规则）</h2>
+  <div class="table-scroll">
+    <table class="table">
+      <thead>
+        <tr><th>#</th><th>分区名</th><th>优先级</th><th>水位闭区间</th><th>流量闭区间</th></tr>
+      </thead>
+      <tbody>
+        {% for r in current.rules %}
+          <tr class="{{ 'flood-row' if r.zone == '洪水样本区' else '' }}">
+            <td>{{ loop.index }}</td>
+            <td><strong>{{ r.zone }}</strong>{% if r.zone == '洪水样本区' %} <span class="badge badge-flood">高水 × 高流量优先</span>{% endif %}</td>
+            <td><span class="prio prio-{{ 'top' if r.priority == 1 else 'normal' }}">{{ r.priority }}</span></td>
+            <td>[{{ r.wl_min }}, {{ r.wl_max }}]</td>
+            <td>[{{ r.fl_min }}, {{ r.fl_max }}]</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% endblock %}

@@ -1,0 +1,124 @@
+{# 核对报告面板：成功 / 结构错误 / 漏分见证 / 并列见证 #}
+{% macro report_panel(report) %}
+  {% if report.ok %}
+    <div class="panel panel-ok">
+      <h3>✅ 核对通过，可以发布</h3>
+      <p>
+        共扫描 <strong>{{ report.elementary_cells }}</strong> 个端点初等格
+        （{{ report.rule_count }} 条规则，实际参与
+        {{ report.active_rule_count if report.active_rule_count is defined else '—' }} 条），
+        无漏分、无最高级并列。量程内每对读数都有唯一最高优先级规则。
+      </p>
+      {% if report.checked_against %}
+        <p class="muted">交叉复核：{{ report.checked_against.note }}</p>
+      {% endif %}
+      {{ warnings(report) }}
+    </div>
+  {% else %}
+    <div class="panel panel-bad">
+      <h3>❌ 核对未通过，本次发布已驳回，现行口径不变</h3>
+
+      {% if report.structural_errors %}
+        <div class="issue-block">
+          <h4>填写 / 结构问题（{{ report.structural_errors|length }}）</h4>
+          <ul class="error-list">
+            {% for e in report.structural_errors %}<li>{{ e }}</li>{% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      {% if report.gap %}
+        <div class="issue-block issue-gap">
+          <h4>漏分：存在没有任何规则命中的读数（{{ report.gap_cell_count }} 个初等格）</h4>
+          {{ witness_pair(report.gap, 'gap') }}
+          <p class="muted">
+            该对读数在候选口径下落入整数格
+            水位 {{ report.gap.wl_cell[0] }}–{{ report.gap.wl_cell[1] }}、
+            流量 {{ report.gap.flow_cell[0] }}–{{ report.gap.flow_cell[1] }}，
+            格内归属完全相同；重复提交同一口径会得到同一见证点。
+          </p>
+        </div>
+      {% endif %}
+
+      {% if report.tie %}
+        <div class="issue-block issue-tie">
+          <h4>最高级并列：优先级 {{ report.tie.priority }} 同时被多条最高规则命中
+            （{{ report.tie_cell_count }} 个初等格）</h4>
+          {{ witness_pair(report.tie, 'tie') }}
+          <div class="tie-zones">
+            <span class="muted">该点命中的最高级分区：</span>
+            {% for z in report.tie.top_zones %}
+              <span class="badge badge-tie">{{ z }}</span>
+            {% endfor %}
+          </div>
+          <table class="table table-compact">
+            <thead><tr><th>并列规则</th><th>优先级</th><th>水位区间</th><th>流量区间</th></tr></thead>
+            <tbody>
+              {% for r in report.tie.top_rules %}
+                <tr>
+                  <td>{{ r.zone }}</td>
+                  <td>{{ r.priority }}</td>
+                  <td>[{{ r.wl_interval[0] }}, {{ r.wl_interval[1] }}]</td>
+                  <td>[{{ r.fl_interval[0] }}, {{ r.fl_interval[1] }}]</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
+      {{ warnings(report) }}
+
+      {% if report.gap_samples and report.gap_samples|length > 1 %}
+        <details class="more-samples">
+          <summary>其余漏分见证格（最多展示 {{ report.gap_samples|length }} 个）</summary>
+          {{ sample_table(report.gap_samples, false) }}
+        </details>
+      {% endif %}
+      {% if report.tie_samples and report.tie_samples|length > 1 %}
+        <details class="more-samples">
+          <summary>其余并列见证格（最多展示 {{ report.tie_samples|length }} 个）</summary>
+          {{ sample_table(report.tie_samples, true) }}
+        </details>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro witness_pair(w, kind) %}
+  <div class="witness witness-{{ kind }}">
+    <span class="witness-label">可复现读数对</span>
+    <span class="witness-pair">水位 = <strong>{{ w.water_level }}</strong>，流量 = <strong>{{ w.flow }}</strong></span>
+    <a class="btn btn-small"
+       href="{{ url_for('web.index', wl=w.water_level, flow=w.flow) }}">
+      查该对读数的现行归属 ↗
+    </a>
+  </div>
+{% endmacro %}
+
+{% macro warnings(report) %}
+  {% if report.warnings %}
+    <div class="issue-block">
+      <h4>⚠️ 提示（不影响通过）</h4>
+      <ul class="warn-list">
+        {% for w in report.warnings %}<li>{{ w }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro sample_table(samples, with_zones) %}
+  <table class="table table-compact">
+    <thead><tr><th>水位</th><th>流量</th><th>水位格</th><th>流量格</th>{% if with_zones %}<th>最高级分区</th>{% endif %}</tr></thead>
+    <tbody>
+      {% for s in samples %}
+        <tr>
+          <td>{{ s.water_level }}</td><td>{{ s.flow }}</td>
+          <td>[{{ s.wl_cell[0] }}, {{ s.wl_cell[1] }}]</td>
+          <td>[{{ s.flow_cell[0] }}, {{ s.flow_cell[1] }}]</td>
+          {% if with_zones %}<td>{{ s.top_zones | join('、') }}</td>{% endif %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endmacro %}

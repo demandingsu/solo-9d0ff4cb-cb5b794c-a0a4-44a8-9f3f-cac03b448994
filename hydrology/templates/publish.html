@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}发布修订 · 水文分区发布台{% endblock %}
+{% block content %}
+
+{% set er = editor_range %}
+{% set erules = editor_rules if editor_rules is not none else current.rules %}
+
+<div class="page-head">
+  <h1>发布口径修订</h1>
+  <p class="muted">
+    可<strong>单独更新量程</strong>、<strong>单独更新分区表</strong>，或<strong>一并发布</strong>。
+    每次发布前都会用另一项届时生效的版本交叉复核：量程内每对读数必须有唯一最高优先级规则；
+    不通过则驳回，现行口径继续有效，查算页不受影响。
+  </p>
+  {% if restore %}
+    <div class="panel panel-warn">
+      已载回第 <strong>#{{ restore.id }}</strong> 笔被驳回提交（{{ restore.kind|kind_label }}）的内容，
+      修改后可再次提交。
+    </div>
+  {% endif %}
+  {% if fatal %}
+    <div class="panel panel-bad"><h3>{{ fatal }}</h3></div>
+  {% endif %}
+</div>
+
+<form method="post" action="{{ url_for('web.publish_page') }}" id="publish-form">
+
+  <section class="card">
+    <h2>① 有效量程（整数闭区间）</h2>
+    <div class="range-editor">
+      <label>水位下限
+        <input type="text" inputmode="numeric" name="wl_min"
+               value="{{ er.wl_min if er is not none and er.wl_min is not none else (current.range.wl_min if current.range else '') }}">
+      </label>
+      <label>水位上限
+        <input type="text" inputmode="numeric" name="wl_max"
+               value="{{ er.wl_max if er is not none and er.wl_max is not none else (current.range.wl_max if current.range else '') }}">
+      </label>
+      <label>流量下限
+        <input type="text" inputmode="numeric" name="fl_min"
+               value="{{ er.fl_min if er is not none and er.fl_min is not none else (current.range.fl_min if current.range else '') }}">
+      </label>
+      <label>流量上限
+        <input type="text" inputmode="numeric" name="fl_max"
+               value="{{ er.fl_max if er is not none and er.fl_max is not none else (current.range.fl_max if current.range else '') }}">
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="rules-head">
+      <h2>② 分区规则表</h2>
+      <button type="button" class="btn" id="add-rule">＋ 添加规则行</button>
+    </div>
+    <p class="muted">每行填写分区名、优先级（整数，<strong>数值越小越高，1 为最高</strong>）和水位 / 流量整数闭区间。</p>
+
+    <div class="table-scroll">
+      <table class="table rule-editor-table">
+        <thead>
+          <tr>
+            <th class="col-ord">#</th>
+            <th>分区名</th>
+            <th>优先级</th>
+            <th>水位下限</th><th>水位上限</th>
+            <th>流量下限</th><th>流量上限</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rules-tbody">
+          {% for r in erules %}
+            <tr class="rule-row">
+              <td class="row-ord">{{ loop.index }}
+                <input type="hidden" name="rule_id" value="{{ r.id if r.id is not none else '' }}">
+              </td>
+              <td><input type="text" name="zone" value="{{ r.zone or '' }}"></td>
+              <td><input type="text" inputmode="numeric" name="priority" class="num" value="{{ r.priority if r.priority is not none else '' }}"></td>
+              <td><input type="text" inputmode="numeric" name="wl_min" class="num" value="{{ r.wl_min if r.wl_min is not none else '' }}"></td>
+              <td><input type="text" inputmode="numeric" name="wl_max" class="num" value="{{ r.wl_max if r.wl_max is not none else '' }}"></td>
+              <td><input type="text" inputmode="numeric" name="fl_min" class="num" value="{{ r.fl_min if r.fl_min is not none else '' }}"></td>
+              <td><input type="text" inputmode="numeric" name="fl_max" class="num" value="{{ r.fl_max if r.fl_max is not none else '' }}"></td>
+              <td><button type="button" class="btn btn-small btn-danger-outline remove-rule">删除</button></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <template id="rule-row-template">
+      <tr class="rule-row">
+        <td class="row-ord">
+          <input type="hidden" name="rule_id" value="">
+        </td>
+        <td><input type="text" name="zone" value=""></td>
+        <td><input type="text" inputmode="numeric" name="priority" class="num" value="10"></td>
+        <td><input type="text" inputmode="numeric" name="wl_min" class="num" value="0"></td>
+        <td><input type="text" inputmode="numeric" name="wl_max" class="num" value="0"></td>
+        <td><input type="text" inputmode="numeric" name="fl_min" class="num" value="0"></td>
+        <td><input type="text" inputmode="numeric" name="fl_max" class="num" value="0"></td>
+        <td><button type="button" class="btn btn-small btn-danger-outline remove-rule">删除</button></td>
+      </tr>
+    </template>
+  </section>
+
+  <section class="card publish-bar">
+    <label class="note-field">
+      修订备注（可选）
+      <input type="text" name="note" maxlength="200" placeholder="例如：扩大汛期流量上限 / 新增洪峰并列区修正">
+    </label>
+    <div class="publish-actions">
+      <button type="submit" name="action" value="ranges" class="btn">仅发布量程修订</button>
+      <button type="submit" name="action" value="rules" class="btn">仅发布分区表修订</button>
+      <button type="submit" name="action" value="bundle" class="btn btn-primary">一并发布（量程 + 分区表）</button>
+    </div>
+    <p class="muted small">
+      “仅量程”只采用上方①，并用<strong>现行分区表</strong>复核；“仅分区表”只采用②，并用<strong>现行量程</strong>复核；
+      “一并发布”用①+②成对复核。任一核对失败，三个动作都不会改动现行口径。
+    </p>
+  </section>
+</form>
+
+<section class="card api-hint">
+  <h2>JSON 接口</h2>
+  <pre>POST /api/publish/ranges   {"wl_min":0,"wl_max":120,"fl_min":0,"fl_max":1000}
+POST /api/publish/rules    {"rules":[{"zone":"…","priority":1,"wl_min":..,"wl_max":..,"fl_min":..,"fl_max":..}]}
+POST /api/publish/bundle   {"wl_min":..,"wl_max":..,"fl_min":..,"fl_max":..,"rules":[ … ]}
+POST /api/verify           （同 bundle 载荷，只核对不发布）
+GET  /api/classify?wl=90&amp;flow=900</pre>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var tbody = document.getElementById('rules-tbody');
+  var tpl = document.getElementById('rule-row-template');
+
+  function renumber() {
+    var rows = tbody.querySelectorAll('tr.rule-row');
+    rows.forEach(function (tr, i) {
+      var cell = tr.querySelector('.row-ord');
+      if (cell) cell.textContent = i + 1;
+    });
+  }
+
+  document.getElementById('add-rule').addEventListener('click', function () {
+    var node = tpl.content.firstElementChild.cloneNode(true);
+    tbody.appendChild(node);
+    renumber();
+  });
+
+  tbody.addEventListener('click', function (e) {
+    var btn = e.target.closest('.remove-rule');
+    if (!btn) return;
+    btn.closest('tr.rule-row').remove();
+    renumber();
+  });
+
+  // 防止在输入框按回车触发隐式提交：三种发布动作都应显式点击。
+  document.getElementById('publish-form').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input') e.preventDefault();
+  });
+
+  renumber();
+})();
+</script>
+{% endblock %}

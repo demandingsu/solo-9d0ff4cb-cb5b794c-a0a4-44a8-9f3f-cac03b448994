@@ -1,0 +1,25 @@
+services:
+  web:
+    build: .
+    image: hydrology-publish:latest
+    container_name: hydrology-publish
+    ports:
+      - "8000:8000"
+    environment:
+      HYDROLOGY_DB: /data/hydrology.db
+    volumes:
+      - hydrology-sqlite:/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,urllib.request; d=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/current', timeout=3)); assert d['range'] and d['rules']"
+      interval: 10s
+      timeout: 4s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  hydrology-sqlite:

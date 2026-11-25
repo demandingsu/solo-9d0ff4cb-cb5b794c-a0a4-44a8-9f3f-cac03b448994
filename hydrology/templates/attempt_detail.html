@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_report.html" import report_panel %}
+{% block title %}核对记录 #{{ attempt.id }} · 水文分区发布台{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1>提交 #{{ attempt.id }}
+    {% if attempt.accepted %}
+      <span class="badge badge-ok">核对通过 · 已发布</span>
+    {% else %}
+      <span class="badge badge-bad">核对驳回 · 现行口径未变</span>
+    {% endif %}
+  </h1>
+  <p class="muted">
+    {{ attempt.created_at.replace('T', ' ').replace('+00:00', ' UTC') }} ·
+    类型：{{ attempt.kind|kind_label }} · 来源：{{ attempt.source }}
+    {% if attempt.note %} · 备注：{{ attempt.note }}{% endif %}
+  </p>
+  <p>
+    <a class="btn" href="{{ url_for('web.attempts_page') }}">← 返回记录列表</a>
+    {% if candidate and not attempt.accepted and attempt.kind != 'seed' %}
+      <a class="btn btn-primary"
+         href="{{ url_for('web.publish_page', restore=attempt.id) }}">载回此稿修改后重提</a>
+    {% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('web.index') }}">去查单对读数</a>
+  </p>
+</div>
+
+{{ report_panel(report) }}
+
+<section class="card">
+  <h2>版本与交叉复核信息</h2>
+  <ul class="meta-list">
+    <li>本笔成功后量程版本：
+      {% if attempt.range_id %}<strong>#{{ attempt.range_id }}</strong>{% else %}未产生{% endif %}</li>
+    <li>本笔成功后分区表版本：
+      {% if attempt.rules_id %}<strong>#{{ attempt.rules_id }}</strong>{% else %}未产生{% endif %}</li>
+    <li>复核时参照的届时生效量程版本：
+      {% if attempt.base_range_id %}#{{ attempt.base_range_id }}{% else %}—{% endif %}</li>
+    <li>复核时参照的届时生效分区表版本：
+      {% if attempt.base_rules_id %}#{{ attempt.base_rules_id }}{% else %}—{% endif %}</li>
+    <li>当前现行版本：量程 #{{ current.range_id }} / 分区表 #{{ current.rules_id }}</li>
+  </ul>
+</section>
+
+{% if candidate %}
+<section class="card">
+  <h2>提交的候选内容</h2>
+  <details>
+    <summary>查看候选 JSON</summary>
+    <pre class="json-pre">{{ candidate | tojson(indent=2) }}</pre>
+  </details>
+</section>
+{% endif %}
+
+{% endblock %}
